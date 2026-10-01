@@ -10,6 +10,8 @@ import paymentRoutes from "./routes/payment.routes.js";
 
 const app = express();
 
+// app.use(express.json());
+
 app.use(
   express.json({
     verify: (req, _res, buf) => {
@@ -78,18 +80,6 @@ app.get(
     res.status(200).json({
       status: "success",
       message: "Delivery agent access granted",
-    });
-  },
-);
-
-app.get(
-  "/api/admin-test",
-  protect,
-  requireRole("admin"),
-  (req: AuthenticatedRequest, res) => {
-    res.status(200).json({
-      status: "success",
-      message: "You are an admin",
     });
   },
 );

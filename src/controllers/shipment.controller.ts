@@ -5,6 +5,8 @@ import DeliveryAgent from "../models/deliveryAgent.model.js";
 import generateTrackingNumber from "../utils/trackingNumber.js";
 import type { ShipmentStatus } from "../models/shipment.model.js";
 import { isValidStatusTransition } from "../utils/shipmentStatus.js";
+import { getRedisValue, setRedisValue } from "../services/redis.service.js";
+import { deleteShipmentCache } from "../services/redis.service.js";
 
 export const createShipment = async (
   req: AuthenticatedRequest,
@@ -44,6 +46,8 @@ export const createShipment = async (
       },
     ],
   });
+
+  await deleteShipmentCache();
 
   res.status(201).json({
     status: "success",
@@ -142,6 +146,15 @@ export const getShipments = async (
 
   const skip = (page - 1) * limit;
 
+  const cacheKey = `shipments:${req.userId}:${req.query.status || ""}:${req.query.minFee || ""}:${req.query.maxFee || ""}:${req.query.search || ""}:${sort}:${page}:${limit}`;
+
+  const cachedData = await getRedisValue(cacheKey);
+
+  if (cachedData) {
+    res.status(200).json(JSON.parse(cachedData));
+    return;
+  }
+
   const shipments = await Shipment.find(filter)
     .sort(sort)
     .skip(skip)
@@ -151,7 +164,7 @@ export const getShipments = async (
 
   const totalPages = Math.ceil(totalResults / limit);
 
-  res.status(200).json({
+  const responseData = {
     status: "success",
     results: shipments.length,
     pagination: {
@@ -163,7 +176,11 @@ export const getShipments = async (
     data: {
       shipments,
     },
-  });
+  };
+
+  await setRedisValue(cacheKey, JSON.stringify(responseData), 300);
+
+  res.status(200).json(responseData);
 };
 
 export const updateShipmentStatus = async (
@@ -233,6 +250,8 @@ export const updateShipmentStatus = async (
   });
 
   await shipment.save();
+
+  await deleteShipmentCache();
 
   res.status(200).json({
     status: "success",
