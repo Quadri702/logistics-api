@@ -45,3 +45,19 @@ export const incrementRateLimit = async (
 
   return currentCount;
 };
+
+export const acquireLock = async (
+  key: string,
+  expirationInSeconds: number,
+): Promise<boolean> => {
+  const result = await redisClient.set(key, "locked", {
+    NX: true,
+    EX: expirationInSeconds,
+  });
+
+  return result === "OK";
+};
+
+export const releaseLock = async (key: string): Promise<void> => {
+  await redisClient.del(key);
+};

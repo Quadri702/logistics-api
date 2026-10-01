@@ -6,7 +6,11 @@ import generateTrackingNumber from "../utils/trackingNumber.js";
 import type { ShipmentStatus } from "../models/shipment.model.js";
 import { isValidStatusTransition } from "../utils/shipmentStatus.js";
 import { getRedisValue, setRedisValue } from "../services/redis.service.js";
-import { deleteShipmentCache } from "../services/redis.service.js";
+import {
+  deleteShipmentCache,
+  acquireLock,
+  releaseLock,
+} from "../services/redis.service.js";
 
 export const createShipment = async (
   req: AuthenticatedRequest,
@@ -196,70 +200,87 @@ export const updateShipmentStatus = async (
     return;
   }
 
-  const { status } = req.body;
+  const lockKey = `lock:shipment:${req.params.id}`;
 
-  const shipment = await Shipment.findById(req.params.id);
+  const lockAcquired = await acquireLock(lockKey, 30);
 
-  if (!shipment) {
-    res.status(404).json({
+  if (!lockAcquired) {
+    res.status(409).json({
       status: "fail",
-      message: "Shipment not found",
+      message: "Shipment is currently being updated. Please try again.",
     });
 
     return;
   }
 
-  const allowedStatuses: ShipmentStatus[] = [
-    "PENDING",
-    "CONFIRMED",
-    "ASSIGNED",
-    "PICKED_UP",
-    "IN_TRANSIT",
-    "OUT_FOR_DELIVERY",
-    "DELIVERED",
-    "DELIVERY_FAILED",
-    "RESCHEDULED",
-    "CANCELLED",
-  ];
+  try {
+    const { status } = req.body;
 
-  if (!allowedStatuses.includes(status)) {
-    res.status(400).json({
-      status: "fail",
-      message: "Invalid shipment status",
+    const shipment = await Shipment.findById(req.params.id);
+
+    if (!shipment) {
+      res.status(404).json({
+        status: "fail",
+        message: "Shipment not found",
+      });
+
+      return;
+    }
+
+    const allowedStatuses: ShipmentStatus[] = [
+      "PENDING",
+      "CONFIRMED",
+      "ASSIGNED",
+      "PICKED_UP",
+      "IN_TRANSIT",
+      "OUT_FOR_DELIVERY",
+      "DELIVERED",
+      "DELIVERY_FAILED",
+      "RESCHEDULED",
+      "CANCELLED",
+    ];
+
+    if (!allowedStatuses.includes(status)) {
+      res.status(400).json({
+        status: "fail",
+        message: "Invalid shipment status",
+      });
+
+      return;
+    }
+
+    const validTransition = isValidStatusTransition(shipment.status, status);
+
+    if (!validTransition) {
+      res.status(400).json({
+        status: "fail",
+        message: `Cannot change shipment status from ${shipment.status} to ${status}`,
+      });
+
+      return;
+    }
+
+    shipment.status = status;
+
+    shipment.statusHistory.push({
+      status,
+      changedAt: new Date(),
     });
 
-    return;
-  }
+    await shipment.save();
 
-  const validTransition = isValidStatusTransition(shipment.status, status);
+    await deleteShipmentCache();
 
-  if (!validTransition) {
-    res.status(400).json({
-      status: "fail",
-      message: `Cannot change shipment status from ${shipment.status} to ${status}`,
+    res.status(200).json({
+      status: "success",
+      message: "Shipment status updated successfully",
+      data: {
+        shipment,
+      },
     });
-
-    return;
+  } finally {
+    await releaseLock(lockKey);
   }
-
-  shipment.status = status;
-
-  shipment.statusHistory.push({
-    status,
-    changedAt: new Date(),
-  });
-
-  await shipment.save();
-
-  await deleteShipmentCache();
-
-  res.status(200).json({
-    status: "success",
-    message: "Shipment status updated successfully",
-    data: {
-      shipment,
-    },
-  });
 };
 
 export const assignShipmentToAgent = async (
