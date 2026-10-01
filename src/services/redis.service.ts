@@ -32,3 +32,16 @@ export const deleteShipmentCache = async (): Promise<void> => {
 
   await redisClient.del(keys);
 };
+
+export const incrementRateLimit = async (
+  key: string,
+  expirationInSeconds: number,
+): Promise<number> => {
+  const currentCount = await redisClient.incr(key);
+
+  if (currentCount === 1) {
+    await redisClient.expire(key, expirationInSeconds);
+  }
+
+  return currentCount;
+};

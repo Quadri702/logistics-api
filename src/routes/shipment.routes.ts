@@ -8,12 +8,13 @@ import {
   assignShipmentToAgent,
   updateAssignedShipmentStatus,
 } from "../controllers/shipment.controller.js";
+import { rateLimit } from "../middlewares/rateLimit.middleware.js";
 
 const router = Router();
 
 router.post("/", protect, createShipment);
 
-router.get("/", protect, getShipments);
+router.get("/", protect, rateLimit, getShipments);
 
 router.patch("/:id/status", protect, updateShipmentStatus);
 
