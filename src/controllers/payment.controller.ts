@@ -124,7 +124,7 @@ export const verifyPayment = async (
   }
 
   const payment = await Payment.findOne({
-    reference: reference,
+    reference,
   });
 
   if (!payment) {
@@ -161,9 +161,39 @@ export const verifyPayment = async (
 
     await payment.save();
 
+    const shipment = await Shipment.findById(payment.shipment);
+
+    if (shipment && shipment.status === "PENDING") {
+      shipment.status = "CONFIRMED";
+
+      shipment.statusHistory.push({
+        status: "CONFIRMED",
+        changedAt: new Date(),
+      });
+
+      await shipment.save();
+    }
+
     res.status(200).json({
       status: "success",
       message: "Payment verified successfully",
+      data: {
+        payment,
+        shipment,
+      },
+    });
+
+    return;
+  }
+
+  if (transaction.status === "failed") {
+    payment.status = "FAILED";
+
+    await payment.save();
+
+    res.status(200).json({
+      status: "fail",
+      message: "Payment failed",
       data: {
         payment,
       },
@@ -172,15 +202,150 @@ export const verifyPayment = async (
     return;
   }
 
-  payment.status = "FAILED";
+  if (transaction.status === "abandoned") {
+    payment.status = "ABANDONED";
+
+    await payment.save();
+
+    res.status(200).json({
+      status: "fail",
+      message: "Payment was abandoned",
+      data: {
+        payment,
+      },
+    });
+
+    return;
+  }
+
+  if (transaction.status === "reversed") {
+    payment.status = "REVERSED";
+
+    await payment.save();
+
+    res.status(200).json({
+      status: "fail",
+      message: "Payment was reversed",
+      data: {
+        payment,
+      },
+    });
+
+    return;
+  }
+
+  payment.status = "PENDING";
 
   await payment.save();
 
   res.status(200).json({
-    status: "fail",
-    message: "Payment was not successful",
+    status: "pending",
+    message: "Payment is still being processed",
     data: {
       payment,
     },
+  });
+};
+
+export const paystackWebhook = async (
+  req: AuthenticatedRequest,
+  res: Response,
+): Promise<void> => {
+  const signature = req.headers["x-paystack-signature"];
+
+  if (typeof signature !== "string") {
+    res.status(400).json({
+      status: "fail",
+      message: "Missing Paystack signature",
+    });
+    return;
+  }
+
+  const rawBody = (
+    req as typeof req & {
+      rawBody?: Buffer;
+    }
+  ).rawBody;
+
+  if (!rawBody) {
+    res.status(400).json({
+      status: "fail",
+      message: "Request body is missing",
+    });
+    return;
+  }
+
+  const hash = crypto
+    .createHmac("sha512", process.env.PAYSTACK_SECRET_KEY as string)
+    .update(rawBody)
+    .digest("hex");
+
+  if (hash !== signature) {
+    res.status(401).json({
+      status: "fail",
+      message: "Invalid Paystack signature",
+    });
+    return;
+  }
+
+  const event = req.body;
+
+  if (event.event === "charge.success") {
+    const transaction = event.data;
+
+    const payment = await Payment.findOne({
+      reference: transaction.reference,
+    });
+
+    if (!payment) {
+      res.status(404).json({
+        status: "fail",
+        message: "Payment not found",
+      });
+      return;
+    }
+
+    const expectedAmount = Math.round(payment.amount * 100);
+
+    if (transaction.amount !== expectedAmount) {
+      res.status(400).json({
+        status: "fail",
+        message: "Payment amount does not match",
+      });
+      return;
+    }
+
+    if (transaction.status === "success") {
+      if (payment.status === "SUCCESS") {
+        res.status(200).json({
+          status: "success",
+          message: "Payment already processed",
+        });
+        return;
+      }
+
+      payment.status = "SUCCESS";
+      payment.paystackTransactionId = transaction.id;
+
+      await payment.save();
+
+      const shipment = await Shipment.findById(payment.shipment);
+
+      if (shipment && shipment.status === "PENDING") {
+        shipment.status = "CONFIRMED";
+
+        shipment.statusHistory.push({
+          status: "CONFIRMED",
+          changedAt: new Date(),
+        });
+
+        await shipment.save();
+      }
+    }
+  }
+
+  res.status(200).json({
+    status: "success",
+    message: "Webhook received successfully",
   });
 };

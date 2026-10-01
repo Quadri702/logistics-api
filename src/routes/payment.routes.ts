@@ -3,6 +3,7 @@ import { protect } from "../middlewares/auth.middleware.js";
 import {
   initializePayment,
   verifyPayment,
+  paystackWebhook,
 } from "../controllers/payment.controller.js";
 
 const router = Router();
@@ -10,5 +11,7 @@ const router = Router();
 router.post("/initialize/:shipmentId", protect, initializePayment);
 
 router.get("/verify/:reference", protect, verifyPayment);
+
+router.post("/webhook", paystackWebhook);
 
 export default router;

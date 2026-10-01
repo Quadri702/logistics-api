@@ -1,7 +1,12 @@
 import mongoose, { Schema } from "mongoose";
 import type { Document } from "mongoose";
 
-export type PaymentStatus = "PENDING" | "SUCCESS" | "FAILED";
+export type PaymentStatus =
+  | "PENDING"
+  | "SUCCESS"
+  | "FAILED"
+  | "ABANDONED"
+  | "REVERSED";
 
 export interface IPayment extends Document {
   shipment: mongoose.Types.ObjectId;
@@ -40,7 +45,7 @@ const paymentSchema = new Schema<IPayment>(
 
     status: {
       type: String,
-      enum: ["PENDING", "SUCCESS", "FAILED"],
+      enum: ["PENDING", "SUCCESS", "FAILED", "ABANDONED", "REVERSED"],
       default: "PENDING",
     },
 

@@ -10,7 +10,17 @@ import paymentRoutes from "./routes/payment.routes.js";
 
 const app = express();
 
-app.use(express.json());
+app.use(
+  express.json({
+    verify: (req, _res, buf) => {
+      (
+        req as typeof req & {
+          rawBody?: Buffer;
+        }
+      ).rawBody = Buffer.from(buf);
+    },
+  }),
+);
 
 app.get("/", (req, res) => {
   res.status(200).json({
