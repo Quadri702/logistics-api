@@ -6,6 +6,7 @@ import generateTrackingNumber from "../utils/trackingNumber.js";
 import type { ShipmentStatus } from "../models/shipment.model.js";
 import { isValidStatusTransition } from "../utils/shipmentStatus.js";
 import { getRedisValue, setRedisValue } from "../services/redis.service.js";
+import shipmentQueue from "../queues/queue.shipment.js";
 import {
   deleteShipmentCache,
   acquireLock,
@@ -49,6 +50,11 @@ export const createShipment = async (
         changedAt: new Date(),
       },
     ],
+  });
+
+  await shipmentQueue.add("send-shipment-notification", {
+    shipmentId: shipment._id.toString(),
+    customerId: req.userId,
   });
 
   await deleteShipmentCache();
