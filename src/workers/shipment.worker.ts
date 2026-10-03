@@ -30,7 +30,10 @@ shipmentWorker.on("completed", (job) => {
 });
 
 shipmentWorker.on("failed", (job, error) => {
-  console.error(`Job ${job?.id} failed:`, error.message);
+  console.error(
+    `Job ${job?.id} failed after ${job?.attemptsMade} attempts:`,
+    error.message,
+  );
 });
 
 shipmentWorker.on("error", (error) => {

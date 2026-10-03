@@ -7,6 +7,10 @@ const shipmentQueue = new Queue("shipment-queue", {
   },
   defaultJobOptions: {
     attempts: 3,
+    backoff: {
+      type: "fixed",
+      delay: 5000,
+    },
   },
 });
 
