@@ -7,6 +7,7 @@ import type { ShipmentStatus } from "../models/shipment.model.js";
 import { isValidStatusTransition } from "../utils/shipmentStatus.js";
 import { getRedisValue, setRedisValue } from "../services/redis.service.js";
 import shipmentQueue from "../queues/queue.shipment.js";
+import { getIO } from "../config/socket.js";
 import {
   deleteShipmentCache,
   acquireLock,
@@ -274,8 +275,14 @@ export const updateShipmentStatus = async (
     });
 
     await shipment.save();
-
     await deleteShipmentCache();
+
+    const io = getIO();
+    const room = `shipment:${shipment._id.toString()}`;
+    io.to(room).emit("shipmentStatusUpdated", {
+      shipmentId: shipment._id.toString(),
+      status: shipment.status,
+    });
 
     res.status(200).json({
       status: "success",
