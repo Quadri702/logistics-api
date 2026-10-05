@@ -7,6 +7,7 @@ import userRoutes from "./routes/user.routes.js";
 import shipmentRoutes from "./routes/shipment.routes.js";
 import deliveryAgentRoutes from "./routes/deliveryAgent.routes.js";
 import paymentRoutes from "./routes/payment.routes.js";
+import analyticsRouter from "./routes/analytics.routes.js";
 
 const app = express();
 
@@ -100,5 +101,6 @@ app.use("/api/users", userRoutes);
 app.use("/api/shipments", shipmentRoutes);
 app.use("/api/delivery-agents", deliveryAgentRoutes);
 app.use("/api/payments", paymentRoutes);
+app.use("/api/analytics", analyticsRouter);
 
 export default app;
