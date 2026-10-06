@@ -8,10 +8,9 @@ import shipmentRoutes from "./routes/shipment.routes.js";
 import deliveryAgentRoutes from "./routes/deliveryAgent.routes.js";
 import paymentRoutes from "./routes/payment.routes.js";
 import analyticsRouter from "./routes/analytics.routes.js";
+import { globalErrorHandler } from "./middlewares/error.middleware.js";
 
 const app = express();
-
-// app.use(express.json());
 
 app.use(
   express.json({
@@ -102,5 +101,12 @@ app.use("/api/shipments", shipmentRoutes);
 app.use("/api/delivery-agents", deliveryAgentRoutes);
 app.use("/api/payments", paymentRoutes);
 app.use("/api/analytics", analyticsRouter);
+app.use((req, res, next) => {
+  res.status(404).json({
+    status: "fail",
+    message: `Cannot ${req.method} ${req.originalUrl}`,
+  });
+});
+app.use(globalErrorHandler);
 
 export default app;

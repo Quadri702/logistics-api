@@ -2,6 +2,7 @@ import type { Request, Response } from "express";
 import bcrypt from "bcryptjs";
 import User from "../models/user.model.js";
 import jwt from "jsonwebtoken";
+import crypto from "node:crypto";
 
 export const register = async (req: Request, res: Response): Promise<void> => {
   const { name, email, password } = req.body;
@@ -39,7 +40,7 @@ export const register = async (req: Request, res: Response): Promise<void> => {
 export const login = async (req: Request, res: Response): Promise<void> => {
   const { email, password } = req.body;
 
-  const user = await User.findOne({ email });
+  const user = await User.findOne({ email }).select("+password");
 
   if (!user) {
     res.status(401).json({
@@ -73,5 +74,110 @@ export const login = async (req: Request, res: Response): Promise<void> => {
   res.status(200).json({
     status: "success",
     token,
+  });
+};
+
+export const forgotPassword = async (
+  req: Request,
+  res: Response,
+): Promise<void> => {
+  const { email } = req.body;
+
+  if (!email) {
+    res.status(400).json({
+      status: "fail",
+      message: "Email is required",
+    });
+    return;
+  }
+
+  const user = await User.findOne({ email });
+
+  if (!user) {
+    res.status(200).json({
+      status: "success",
+      message:
+        "If an account exists for that email, a password reset link has been sent.",
+    });
+    return;
+  }
+
+  const resetToken = crypto.randomBytes(32).toString("hex");
+
+  const hashedToken = crypto
+    .createHash("sha256")
+    .update(resetToken)
+    .digest("hex");
+
+  user.passwordResetToken = hashedToken;
+
+  user.passwordResetExpires = new Date(Date.now() + 10 * 60 * 1000);
+
+  await user.save();
+
+  res.status(200).json({
+    status: "success",
+    message:
+      "If an account exists for that email, a password reset link has been sent.",
+  });
+};
+
+export const resetPassword = async (
+  req: Request,
+  res: Response,
+): Promise<void> => {
+  const token = req.params.token as string;
+  const { password } = req.body;
+
+  if (!token) {
+    res.status(400).json({
+      status: "fail",
+      message: "Reset token is required",
+    });
+    return;
+  }
+
+  if (!password) {
+    res.status(400).json({
+      status: "fail",
+      message: "New password is required",
+    });
+    return;
+  }
+
+  const hashedToken = crypto.createHash("sha256").update(token).digest("hex");
+
+  const user = await User.findOne({
+    passwordResetToken: hashedToken,
+    passwordResetExpires: {
+      $gt: new Date(),
+    },
+  }).select("+passwordResetToken +passwordResetExpires");
+
+  if (!user) {
+    res.status(400).json({
+      status: "fail",
+      message: "Invalid or expired password reset token",
+    });
+    return;
+  }
+
+  user.password = await bcrypt.hash(password, 12);
+
+  await User.updateOne(
+    { _id: user._id },
+    {
+      $unset: {
+        passwordResetToken: 1,
+        passwordResetExpires: 1,
+      },
+    },
+  );
+
+  await user.save();
+
+  res.status(200).json({
+    status: "success",
+    message: "Password reset successfully",
   });
 };
