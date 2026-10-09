@@ -9,8 +9,12 @@ import deliveryAgentRoutes from "./routes/deliveryAgent.routes.js";
 import paymentRoutes from "./routes/payment.routes.js";
 import analyticsRouter from "./routes/analytics.routes.js";
 import { globalErrorHandler } from "./middlewares/error.middleware.js";
+import swaggerUi from "swagger-ui-express";
+import swaggerSpec from "./config/swagger.js";
 
 const app = express();
+
+app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
 app.use(
   express.json({
