@@ -1,0 +1,26 @@
+
+services:
+  api:
+    build: .
+    container_name: logistics-api
+    ports:
+      - "5001:5000"
+    env_file:
+      - .env
+    environment:
+      REDIS_URL: redis://host.docker.internal:6379
+      REDIS_HOST: host.docker.internal
+    restart: unless-stopped
+
+  shipment-worker:
+    build: .
+    container_name: logistics-shipment-worker
+    command: ["node", "dist/workers/shipment.worker.js"]
+    env_file:
+      - .env
+    environment:
+      REDIS_URL: redis://host.docker.internal:6379
+      REDIS_HOST: host.docker.internal
+    restart: unless-stopped
+    healthcheck:
+      disable: true
