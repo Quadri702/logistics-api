@@ -1,4 +1,22 @@
+
 import { Worker } from "bullmq";
+
+const redisUrl = new URL(
+  process.env.REDIS_URL || "redis://127.0.0.1:6379",
+);
+
+const connection = {
+  host: redisUrl.hostname,
+  port: Number(redisUrl.port || 6379),
+  ...(redisUrl.username
+    ? { username: decodeURIComponent(redisUrl.username) }
+    : {}),
+  ...(redisUrl.password
+    ? { password: decodeURIComponent(redisUrl.password) }
+    : {}),
+  ...(redisUrl.protocol === "rediss:" ? { tls: {} } : {}),
+  maxRetriesPerRequest: null,
+};
 
 const shipmentWorker = new Worker(
   "shipment-queue",
@@ -13,12 +31,7 @@ const shipmentWorker = new Worker(
       `Notification: Shipment ${shipmentId} has been created for customer ${customerId}`,
     );
   },
-  {
-    connection: {
-      host: process.env.REDIS_HOST || "127.0.0.1",
-      port: 6379,
-    },
-  },
+  { connection },
 );
 
 shipmentWorker.on("ready", () => {
@@ -45,3 +58,4 @@ await shipmentWorker.waitUntilReady();
 console.log("Worker process is running");
 
 export default shipmentWorker;
+

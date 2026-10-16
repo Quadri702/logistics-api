@@ -1,4 +1,3 @@
-
 import "dotenv/config";
 import { createServer } from "node:http";
 import mongoose from "mongoose";
@@ -7,8 +6,9 @@ import connectDatabase from "./config/database.js";
 import redisClient from "./config/redis.js";
 import { initializeSocket } from "./config/socket.js";
 import shipmentQueue from "./queues/queue.shipment.js";
+import shipmentWorker from "./workers/shipment.worker.js";
 
-const PORT = 5000;
+const PORT = Number(process.env.PORT) || 5000;
 
 await connectDatabase();
 await redisClient.connect();
@@ -34,6 +34,9 @@ const shutdown = (signal: NodeJS.Signals): void => {
 
   io.close(async () => {
     try {
+      await shipmentWorker.close();
+      console.log("Shipment worker closed");
+
       await shipmentQueue.close();
       console.log("Shipment queue closed");
 
@@ -56,4 +59,3 @@ const shutdown = (signal: NodeJS.Signals): void => {
 
 process.on("SIGTERM", () => shutdown("SIGTERM"));
 process.on("SIGINT", () => shutdown("SIGINT"));
-
