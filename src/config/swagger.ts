@@ -12,9 +12,17 @@ const swaggerDefinition = {
 
   servers: [
     {
-      url: "http://localhost:5000",
+      url:
+        process.env.NODE_ENV === "production"
+          ? "https://logistics-api-5a93.onrender.com"
+          : "http://localhost:5000",
+      description:
+        process.env.NODE_ENV === "production"
+          ? "Production server"
+          : "Local development server",
     },
   ],
+
   components: {
     securitySchemes: {
       bearerAuth: {
@@ -24,6 +32,7 @@ const swaggerDefinition = {
       },
     },
   },
+
   security: [
     {
       bearerAuth: [],
@@ -33,7 +42,6 @@ const swaggerDefinition = {
 
 const swaggerOptions = {
   definition: swaggerDefinition,
-
   apis: ["./src/docs/*.ts"],
 };
 
