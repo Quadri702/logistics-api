@@ -11,6 +11,8 @@ import analyticsRouter from "./routes/analytics.routes.js";
 import { globalErrorHandler } from "./middlewares/error.middleware.js";
 import swaggerUi from "swagger-ui-express";
 import swaggerSpec from "./config/swagger.js";
+import cors from "cors";
+import helmet from "helmet";
 
 const app = express();
 
@@ -27,6 +29,10 @@ app.use(
     },
   }),
 );
+
+app.use(helmet());
+
+app.use(cors());
 
 app.get("/", (req, res) => {
   res.status(200).json({
